@@ -1,0 +1,104 @@
+import requests
+from bs4 import BeautifulSoup
+import base64
+import json
+import time
+import random
+from urllib.parse import urljoin
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+api_key = os.getenv("GOOGLE_API_KEY")
+cse_id = os.getenv("GOOGLE_CSE_ID")
+
+# Define cities to search for travel blogs
+cities = ["Honolulu",
+    "Santa Ana", "Riverside", "Corpus Christi", "Lexington", "Stockton",
+    "Henderson", "Saint Paul", "St. Louis", "Cincinnati", "Pittsburgh",
+    "Greensboro", "Anchorage", "Plano", "Lincoln", "Orlando",
+    "Irvine", "Newark", "Toledo", "Durham", "Chula Vista",
+    "Fort Wayne", "Jersey City", "St. Petersburg", "Laredo", "Madison",
+    "Chandler", "Buffalo", "Lubbock", "Scottsdale", "Reno",
+    "Glendale", "Gilbert", "Winston-Salem", "North Las Vegas", "Norfolk",
+    "Chesapeake", "Garland", "Boise", "Baton Rouge", "Richmond",
+    "Irving", "Spokane", "Des Moines", "San Bernardino", "Fayetteville"
+]
+
+search_results = []
+url_city_map = {}
+
+def google_search(query, api_key, cse_id):
+    search_url = "https://customsearch.googleapis.com/customsearch/v1"
+    url1 = f"{search_url}?q={query.replace(' ', '+')}&key={api_key}&cx={cse_id}&num=10&start=1"
+    response1 = requests.get(url1)
+    response1.raise_for_status()
+    results1 = response1.json().get("items", [])
+
+    url2 = f"{search_url}?q={query.replace(' ', '+')}&key={api_key}&cx={cse_id}&num=10&start=11"
+    response2 = requests.get(url2)
+    response2.raise_for_status()
+    results2 = response2.json().get("items", [])
+
+    return results1 + results2
+
+def fetch_images(soup, base_url):
+    images = {}
+    img_tags = soup.find_all("img")
+    for i, img in enumerate(img_tags):
+        img_url = img.get("src")
+        if img_url:
+            img_url = urljoin(base_url, img_url)
+            try:
+                img_response = requests.get(img_url, timeout=5)
+                if img_response.status_code == 200:
+                    img_data = base64.b64encode(img_response.content).decode("utf-8")
+                    images[f"image_{i+1}"] = img_data
+            except requests.exceptions.RequestException:
+                continue
+    return images
+
+def scrape_page(url, city):
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        for tag in soup(["nav", "header", "footer", "aside"]):
+            tag.decompose()
+        text_content = soup.get_text(separator="\n", strip=True)
+        images = fetch_images(soup, url)
+        return {"url": url, "text_content": text_content, "images": images, "city": city}
+    except requests.exceptions.RequestException as e:
+        return {"url": url, "error": str(e), "city": city}
+
+for city in cities:
+    query = f"{city} travel blog" # Search travel blogs per city
+    try:
+        results = google_search(query, api_key, cse_id)
+        for item in results:
+            url = item["link"]
+            search_results.append(url)
+            url_city_map[url] = city
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching search results for {city}: {e}")
+
+output_file = "data/scraped_data_2.json"
+os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
+scraped_data = []
+
+for url in search_results:
+    city = url_city_map.get(url, "Unknown")
+    print(f"Scraping {url} for city: {city}...\n")
+    data = scrape_page(url, city)
+    scraped_data.append(data)
+    print(f"Scraped {len(data.get('images', {}))} images and saved content.\n")
+    print("=" * 80)
+    time.sleep(random.uniform(2, 5))
+
+# Write new data to the JSON file
+with open(output_file, "w", encoding="utf-8") as f:
+    json.dump(scraped_data, f, indent=4, ensure_ascii=False)
+
+print(f"Scraping complete! Data saved to {output_file}")
