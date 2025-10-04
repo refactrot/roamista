@@ -1,6 +1,5 @@
 import networkx as nx
 import itertools
-import openrouteservice
 import numpy as np
 from sklearn.cluster import KMeans
 from geopy.distance import great_circle, geodesic

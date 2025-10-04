@@ -66,4 +66,4 @@ def upload(documents, batch_size=50):
 
 
 # Process and upload the itineraries JSON file
-upload(process_json('./data/itineraries.json'))
+upload(process_json('cron\\itineraries.json'))
