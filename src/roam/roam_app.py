@@ -90,7 +90,7 @@ def google_maps_links(itineraries):
     for day in itineraries.values():
         link = "https://www.google.com/maps/dir/"
         for loc in day:
-            link += loc.replace(" ", "+").replace("/", "").replace("’", "").replace("'", "")
+            link += str(loc[0]) + "," + str(loc[1])
             link += "/"
         links.append(link)
     
@@ -112,7 +112,7 @@ def main():
         pois_dict_rag = parse_string(response_rag[response_rag.find("{") : response_rag.find("}") + 1].replace("#", "").replace("*", "").replace("`", "").replace("\n", ""))
         pois_dict_ll, pois_dict_text = TSPSolver.reorder(add_city_for_text(pois_dict_rag))
         # pois_dict_rag_clean = add_city(pois_dict_rag)
-        links = google_maps_links(add_city(pois_dict_text))
+        links = google_maps_links(pois_dict_ll)
         print("Here are the google maps trajectories for each day.")
         for count in range(len(links)):
             print(f"Day {str(count + 1)} Google Maps Trajectory:", end = " ")
